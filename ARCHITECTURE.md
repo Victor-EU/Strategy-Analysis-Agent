@@ -2,118 +2,139 @@
 
 ## Executive Summary
 
-A multi-agent system built on Google ADK (Agent Development Kit) that analyzes companies using classical strategy economics frameworks. The system orchestrates 13 specialized agents through a 7-phase execution pipeline (Phase 0-6), beginning with intelligent context gathering that extracts insider knowledge through guided conversation, followed by parallel analysis, synthesis, report generation, and presentation output.
+A multi-agent system built on Google ADK (Agent Development Kit) that analyzes companies using classical strategy economics frameworks. The system orchestrates 14 specialized agents through an 8-phase execution pipeline (Phase 0-6, with Phase 0.5 for Deep Research), beginning with intelligent context gathering, followed by autonomous deep web research, parallel analysis, synthesis, report generation, and presentation output.
 
 **Tech Stack:**
 - Framework: Google ADK (Python)
 - LLM: Gemini 3 Pro (`gemini-3-pro-preview`) — 1M context window
+- Deep Research: Gemini Deep Research Agent (`deep-research-pro-preview-12-2025`) — Autonomous web research
 - Image Generation: Nano Banana Pro (`gemini-3-pro-image-preview`)
 - PDF Processing: Docling (extraction) + PyMuPDF (generation)
 - Database: SQLite (session caching + logging)
 - Frontend: React/Next.js with light blue design system
 - Language: Python 3.11+
 
-**Key Design Principle:** Analysis quality is bounded by context quality. Phase 0 (Context Gathering) systematically extracts insider knowledge that cannot be found in public sources, enabling dramatically higher-confidence analysis.
+**Key Design Principles:**
+1. **Context Quality Bounds Analysis Quality** — Phase 0 (Context Gathering) systematically extracts insider knowledge that cannot be found in public sources
+2. **Deep Research Before Analysis** — Phase 0.5 conducts autonomous, parallel web research with cited sources, pre-populating a research cache that all analysis agents consume
+3. **Hybrid Research Strategy** — Predictive deep research upfront + quick search fallback for cache misses
 
 ---
 
 ## Part 1: System Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                           STRATEGY ANALYSIS AGENT                                 │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                   │
-│  ┌────────────────────────────────────────────────────────────────────────────┐  │
-│  │                         ORCHESTRATION LAYER                                 │  │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐  │  │
-│  │  │               Strategy Orchestrator (Root Agent)                      │  │  │
-│  │  │   - Manages 7-phase execution (Sequential + Parallel)                 │  │  │
-│  │  │   - Gathers user context before analysis (Phase 0)                    │  │  │
-│  │  │   - Enforces dependency chain                                         │  │  │
-│  │  │   - Runs coherence checks                                             │  │  │
-│  │  │   - Generates executive summary and full report                       │  │  │
-│  │  │   - Triggers presentation generation                                  │  │  │
-│  │  └──────────────────────────────────────────────────────────────────────┘  │  │
-│  └────────────────────────────────────────────────────────────────────────────┘  │
-│                                       │                                          │
-│  ┌────────────────────────────────────┼────────────────────────────────────────┐ │
-│  │                          AGENT LAYER                                        │ │
-│  │                                                                              │ │
-│  │  Phase 0 (Sequential) — CONTEXT GATHERING ★ CRITICAL                        │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │                    Context Gathering Agent                           │   │ │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │   │ │
-│  │  │  │ Foundation      │→ │ Document        │→ │ Guided Interview    │  │   │ │
-│  │  │  │ Setup           │  │ Processor       │  │ Agent               │  │   │ │
-│  │  │  │ (basic info)    │  │ (if docs)       │  │ (conversational)    │  │   │ │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │   │ │
-│  │  │                              ↓                                       │   │ │
-│  │  │                    Writes: user_context:{domain}                     │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  │                                                                             │ │
-│  │  Phase 1 (Parallel) — EXTERNAL CONTEXT                                     │ │
-│  │  ┌──────────────┐  ┌─────────────────────────────┐                         │ │
-│  │  │ Macro Economy│  │     Market Structure        │                         │ │
-│  │  │    Agent     │  │  ┌──────────┐ ┌──────────┐  │                         │ │
-│  │  │              │  │  │Complem-  │ │Substit-  │  │                         │ │
-│  │  │              │  │  │ents      │ │utes      │  │                         │ │
-│  │  └──────────────┘  │  └──────────┘ └──────────┘  │                         │ │
-│  │                    └─────────────────────────────┘                         │ │
-│  │                                                                             │ │
-│  │  Phase 2 (Parallel) — FIRM ANALYSIS                                        │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │ │
-│  │  │ Comparative  │  │ Value Chain  │  │    JTBD      │                      │ │
-│  │  │  Advantage   │  │    Agent     │  │    Agent     │                      │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘                      │ │
-│  │                                                                             │ │
-│  │  Phase 3 (Sequential) — STRATEGY                                           │ │
-│  │  ┌──────────────┐                                                          │ │
-│  │  │ Competitive  │                                                          │ │
-│  │  │  Strategy    │                                                          │ │
-│  │  └──────────────┘                                                          │ │
-│  │                                                                             │ │
-│  │  Phase 4 (Sequential) — SYNTHESIS                                          │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │ │
-│  │  │    SWOT      │  │  Coherence   │  │  Narrative   │                      │ │
-│  │  │  Synthesis   │  │   Checker    │  │  Synthesis   │                      │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘                      │ │
-│  │                                                                             │ │
-│  │  Phase 5 (Sequential) — REPORT GENERATION                                  │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │  ┌─────────────────────────┐    ┌─────────────────────────────────┐ │   │ │
-│  │  │  │  Executive Summary      │ →  │      Full Report Generator      │ │   │ │
-│  │  │  │     Generator           │    │   (Comprehensive Analysis Doc)  │ │   │ │
-│  │  │  └─────────────────────────┘    └─────────────────────────────────┘ │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  │                                                                             │ │
-│  │  Phase 6 (Sequential) — PRESENTATION                                       │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐  │   │ │
-│  │  │  │ Slide Structure │ →  │ Visual Generator│ →  │  PDF Assembler  │  │   │ │
-│  │  │  │ (Gemini 3 Pro)  │    │(Nano Banana Pro)│    │   (PyMuPDF)     │  │   │ │
-│  │  │  └─────────────────┘    └─────────────────┘    └─────────────────┘  │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  └─────────────────────────────────────────────────────────────────────────────┘ │
-│                                       │                                          │
-│  ┌────────────────────────────────────┼────────────────────────────────────────┐ │
-│  │                         SHARED SERVICES                                     │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │ │
-│  │  │ Market Intel │  │  Document    │  │   Context    │  │     PDF      │    │ │
-│  │  │    Tool      │  │  Processor   │  │   Manager    │  │  Generator   │    │ │
-│  │  │ (Web Search) │  │  (Docling)   │  │              │  │  (PyMuPDF)   │    │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │ │
-│  └─────────────────────────────────────────────────────────────────────────────┘ │
-│                                       │                                          │
-│  ┌────────────────────────────────────┼────────────────────────────────────────┐ │
-│  │                       INFRASTRUCTURE LAYER                                  │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │ │
-│  │  │   Session    │  │   Logging    │  │   Shared     │                      │ │
-│  │  │   Service    │  │   Service    │  │   Memory     │                      │ │
-│  │  │  (SQLite)    │  │  (SQLite)    │  │   (State)    │                      │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘                      │ │
-│  └─────────────────────────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                            STRATEGY ANALYSIS AGENT                                     │
+├───────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                        │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                          ORCHESTRATION LAYER                                     │  │
+│  │  ┌───────────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │               Strategy Orchestrator (Root Agent)                           │  │  │
+│  │  │   - Manages 8-phase execution (Phase 0, 0.5, 1-6)                          │  │  │
+│  │  │   - Gathers user context before analysis (Phase 0)                         │  │  │
+│  │  │   - Triggers deep research with predictive task selection (Phase 0.5)      │  │  │
+│  │  │   - Enforces dependency chain                                              │  │  │
+│  │  │   - Runs coherence checks                                                  │  │  │
+│  │  │   - Generates executive summary and full report                            │  │  │
+│  │  │   - Triggers presentation generation                                       │  │  │
+│  │  └───────────────────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────────────────┘  │
+│                                        │                                              │
+│  ┌─────────────────────────────────────┼───────────────────────────────────────────┐  │
+│  │                           AGENT LAYER                                           │  │
+│  │                                                                                  │  │
+│  │  Phase 0 (Sequential) — CONTEXT GATHERING ★ CRITICAL                            │  │
+│  │  ┌────────────────────────────────────────────────────────────────────────┐    │  │
+│  │  │                    Context Gathering Agent                              │    │  │
+│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐     │    │  │
+│  │  │  │ Foundation      │→ │ Document        │→ │ Guided Interview    │     │    │  │
+│  │  │  │ Setup           │  │ Processor       │  │ Agent               │     │    │  │
+│  │  │  │ (basic info)    │  │ (if docs)       │  │ (conversational)    │     │    │  │
+│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘     │    │  │
+│  │  │                              ↓                                          │    │  │
+│  │  │                    Writes: user_context:{domain}                        │    │  │
+│  │  └────────────────────────────────────────────────────────────────────────┘    │  │
+│  │                                                                                  │  │
+│  │  Phase 0.5 (Parallel) — DEEP RESEARCH ★ AUTONOMOUS WEB RESEARCH                 │  │
+│  │  ┌────────────────────────────────────────────────────────────────────────┐    │  │
+│  │  │                    Deep Research Agent                                  │    │  │
+│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐     │    │  │
+│  │  │  │ Research Task   │  │ Parallel Deep   │  │ Research Cache      │     │    │  │
+│  │  │  │ Planner         │→ │ Research Exec   │→ │ Builder             │     │    │  │
+│  │  │  │ (from Phase 0)  │  │ (Interactions)  │  │ (with citations)    │     │    │  │
+│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘     │    │  │
+│  │  │                              ↓                                          │    │  │
+│  │  │                    Writes: research_cache:{domain}                      │    │  │
+│  │  └────────────────────────────────────────────────────────────────────────┘    │  │
+│  │                                                                                  │  │
+│  │  Phase 1 (Parallel) — EXTERNAL CONTEXT                                          │  │
+│  │  ┌──────────────┐  ┌──────────────────────────────┐                             │  │
+│  │  │ Macro Economy│  │     Market Structure         │                             │  │
+│  │  │    Agent     │  │  ┌──────────┐ ┌──────────┐   │                             │  │
+│  │  │  (uses cache)│  │  │Complem-  │ │Substit-  │   │                             │  │
+│  │  │              │  │  │ents      │ │utes      │   │                             │  │
+│  │  └──────────────┘  │  │(uses     │ │(uses     │   │                             │  │
+│  │                    │  │ cache)   │ │ cache)   │   │                             │  │
+│  │                    │  └──────────┘ └──────────┘   │                             │  │
+│  │                    └──────────────────────────────┘                             │  │
+│  │                                                                                  │  │
+│  │  Phase 2 (Parallel) — FIRM ANALYSIS                                             │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                           │  │
+│  │  │ Comparative  │  │ Value Chain  │  │    JTBD      │                           │  │
+│  │  │  Advantage   │  │    Agent     │  │    Agent     │                           │  │
+│  │  │ (uses cache) │  │ (uses cache) │  │ (uses cache) │                           │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                           │  │
+│  │                                                                                  │  │
+│  │  Phase 3 (Sequential) — STRATEGY                                                │  │
+│  │  ┌──────────────┐                                                               │  │
+│  │  │ Competitive  │                                                               │  │
+│  │  │  Strategy    │                                                               │  │
+│  │  │ (uses cache) │                                                               │  │
+│  │  └──────────────┘                                                               │  │
+│  │                                                                                  │  │
+│  │  Phase 4 (Sequential) — SYNTHESIS                                               │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                           │  │
+│  │  │    SWOT      │  │  Coherence   │  │  Narrative   │                           │  │
+│  │  │  Synthesis   │  │   Checker    │  │  Synthesis   │                           │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                           │  │
+│  │                                                                                  │  │
+│  │  Phase 5 (Sequential) — REPORT GENERATION                                       │  │
+│  │  ┌────────────────────────────────────────────────────────────────────────┐    │  │
+│  │  │  ┌─────────────────────────┐    ┌─────────────────────────────────┐    │    │  │
+│  │  │  │  Executive Summary      │ →  │      Full Report Generator      │    │    │  │
+│  │  │  │     Generator           │    │   (Comprehensive Analysis Doc)  │    │    │  │
+│  │  │  └─────────────────────────┘    └─────────────────────────────────┘    │    │  │
+│  │  └────────────────────────────────────────────────────────────────────────┘    │  │
+│  │                                                                                  │  │
+│  │  Phase 6 (Sequential) — PRESENTATION                                            │  │
+│  │  ┌────────────────────────────────────────────────────────────────────────┐    │  │
+│  │  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐     │    │  │
+│  │  │  │ Slide Structure │ →  │ Visual Generator│ →  │  PDF Assembler  │     │    │  │
+│  │  │  │ (Gemini 3 Pro)  │    │(Nano Banana Pro)│    │   (PyMuPDF)     │     │    │  │
+│  │  │  └─────────────────┘    └─────────────────┘    └─────────────────┘     │    │  │
+│  │  └────────────────────────────────────────────────────────────────────────┘    │  │
+│  └─────────────────────────────────────────────────────────────────────────────────┘  │
+│                                        │                                              │
+│  ┌─────────────────────────────────────┼───────────────────────────────────────────┐  │
+│  │                          SHARED SERVICES                                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │  │
+│  │  │ Market Intel │  │  Document    │  │  Research    │  │     PDF      │         │  │
+│  │  │    Tool      │  │  Processor   │  │   Cache      │  │  Generator   │         │  │
+│  │  │ (Fallback)   │  │  (Docling)   │  │  Manager     │  │  (PyMuPDF)   │         │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘         │  │
+│  └─────────────────────────────────────────────────────────────────────────────────┘  │
+│                                        │                                              │
+│  ┌─────────────────────────────────────┼───────────────────────────────────────────┐  │
+│  │                        INFRASTRUCTURE LAYER                                     │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                           │  │
+│  │  │   Session    │  │   Logging    │  │   Shared     │                           │  │
+│  │  │   Service    │  │   Service    │  │   Memory     │                           │  │
+│  │  │  (SQLite)    │  │  (SQLite)    │  │   (State)    │                           │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                           │  │
+│  └─────────────────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -123,11 +144,14 @@ A multi-agent system built on Google ADK (Agent Development Kit) that analyzes c
 | Purpose | Model | Model ID | Context | Notes |
 |---------|-------|----------|---------|-------|
 | Analysis Agents | Gemini 3 Pro | `gemini-3-pro-preview` | 1M tokens | Extended thinking enabled |
+| **Deep Research** | **Deep Research Agent** | `deep-research-pro-preview-12-2025` | N/A | **Autonomous multi-step web research via Interactions API** |
 | Report Generation | Gemini 3 Pro | `gemini-3-pro-preview` | 1M tokens | Executive summary + full report |
 | Presentation Structure | Gemini 3 Pro | `gemini-3-pro-preview` | 1M tokens | Slide planning |
 | Visual Generation | Nano Banana Pro | `gemini-3-pro-image-preview` | N/A | 2K/4K infographics |
 
 **Analysis Model Settings:** temperature=0.7, max_output_tokens=8192, thinking_level=HIGH
+
+**Deep Research Settings:** background=true, stream=true, thinking_summaries=auto, max_research_time=60min, typical_completion=20min
 
 **Image Generation Settings:** response_modalities=[IMAGE, TEXT], image_size=2K, aspect_ratio=16:9
 
@@ -327,13 +351,205 @@ Based on context gathered, the system determines the analysis mode:
 
 ---
 
+### 3.0.5 Deep Research Agent (Phase 0.5) — AUTONOMOUS WEB RESEARCH
+
+**Purpose:** Conduct comprehensive, parallel web research based on Phase 0 context to pre-populate a research cache with cited reports that all downstream analysis agents consume.
+
+**Type:** `ParallelAgent` managing multiple Deep Research interactions via the Interactions API
+
+**Why This Phase Exists:**
+
+| Without Phase 0.5 | With Phase 0.5 |
+|-------------------|----------------|
+| Each agent does ad-hoc web searches | Research happens once, shared by all |
+| Shallow, quick lookups | Deep, multi-step research with citations |
+| Inconsistent source quality | Verified, cited sources |
+| Redundant searches across agents | Cached results, no duplication |
+| Variable research depth | Comprehensive coverage per domain |
+
+**Architecture:**
+```
+Deep Research Agent (Phase 0.5)
+├── Research Task Planner
+│   └── Analyzes: Phase 0 context (company, industry, strategic question)
+│   └── Selects: Which research tasks to run based on analysis needs
+│   └── Prioritizes: Core tasks always run; conditional tasks based on context
+├── Parallel Deep Research Executor
+│   └── Launches: Multiple Deep Research interactions in parallel
+│   └── Uses: Gemini Interactions API with background=true
+│   └── Streams: Progress updates for UX feedback
+│   └── Handles: Reconnection for long-running research
+└── Research Cache Builder
+    └── Collects: All research results with citations
+    └── Indexes: By domain for fast agent lookup
+    └── Stores: research_cache:{domain} in shared state
+```
+
+---
+
+#### 3.0.5.1 Research Task Templates
+
+**Core Tasks (Always Run):**
+
+| Task Key | Query Template | Target Domain |
+|----------|---------------|---------------|
+| `company_overview` | "Comprehensive business analysis of {company}: business model, revenue streams, key products/services, recent strategic moves, financial performance, and market position in {industry}" | All agents |
+| `competitor_landscape` | "Detailed competitive landscape analysis for {company} in {industry}: top 5 competitors, their strengths/weaknesses, market share, strategic positioning, and competitive dynamics" | Substitutes, Competitive Strategy |
+| `industry_trends` | "Industry trends and market dynamics in {industry} 2024-2025: growth drivers, disruption risks, regulatory changes, technology shifts, and emerging opportunities" | Macro Economy, all agents |
+
+**Conditional Tasks (Based on Strategic Question):**
+
+| Task Key | Query Template | Condition | Target Domain |
+|----------|---------------|-----------|---------------|
+| `value_chain_economics` | "Value chain and supply chain analysis for {industry}: key activities, cost structures, margin distribution, make-vs-buy trends, and vertical integration patterns" | Strategic question mentions costs, margins, supply chain | Value Chain |
+| `customer_segments` | "Customer segmentation and jobs-to-be-done analysis for {company} in {industry}: customer types, purchase drivers, switching costs, and unmet needs" | Strategic question mentions customers, growth, segments | JTBD |
+| `partnership_ecosystem` | "Partner ecosystem and complement analysis for {company}: key partnerships, integration dependencies, platform relationships, and ecosystem health" | Strategic question mentions partnerships, ecosystem, platform | Complements |
+| `macro_regulatory` | "Macroeconomic and regulatory factors affecting {industry} in {geography}: economic indicators, policy changes, trade dynamics, and geopolitical risks" | Strategic question mentions regulation, policy, macro | Macro Economy |
+| `emerging_threats` | "Emerging competitive threats and disruptors in {industry}: new entrants, technology disruption, business model innovation, and substitute threats" | Strategic question mentions disruption, threats, future | Substitutes |
+
+---
+
+#### 3.0.5.2 Deep Research Execution
+
+**Invocation via Interactions API:**
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| `agent` | `deep-research-pro-preview-12-2025` | Deep Research agent |
+| `background` | `true` | Required for async execution |
+| `stream` | `true` | Enable progress tracking |
+| `agent_config.thinking_summaries` | `auto` | Get research progress updates |
+
+**Parallel Execution Pattern:**
+
+1. Launch all selected research tasks simultaneously
+2. Each task runs as independent Deep Research interaction
+3. Collect results as they complete (not waiting for all)
+4. Build research cache incrementally
+5. Timeout: 30 minutes max wait (typical: 15-20 min for all tasks)
+
+**Error Handling:**
+
+| Scenario | Behavior |
+|----------|----------|
+| Single task fails | Continue with other tasks; flag gap in cache |
+| All tasks fail | Fall back to quick search mode; warn user |
+| Timeout exceeded | Use partial results; flag incomplete research |
+| Rate limit hit | Retry with exponential backoff |
+
+---
+
+#### 3.0.5.3 Research Cache Structure
+
+**Cache Entry Schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| task_key | string | Research task identifier |
+| query | string | The research query sent |
+| report | string | Full research report with markdown |
+| citations | list[Citation] | Source URLs with titles |
+| research_time_seconds | int | Time taken for research |
+| completed_at | datetime | Completion timestamp |
+| word_count | int | Report length |
+| confidence_indicators | object | Quality signals from Deep Research |
+
+**Citation Schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| url | string | Source URL |
+| title | string | Page/article title |
+| domain | string | Source domain |
+| accessed_at | datetime | When accessed |
+| relevance | float | Relevance score (0-1) |
+
+**Output Keys:**
+
+| Key | Description |
+|-----|-------------|
+| `research_cache` | Full cache object with all results |
+| `research_cache:company_overview` | Company overview research |
+| `research_cache:competitor_landscape` | Competitor analysis |
+| `research_cache:industry_trends` | Industry trends research |
+| `research_cache:{task_key}` | Domain-specific research |
+| `research_metadata` | Timing, task count, cache stats |
+| `research_gaps` | Tasks that failed or timed out |
+
+---
+
+#### 3.0.5.4 Agent Cache Consumption
+
+Each analysis agent queries the research cache for relevant information:
+
+**Lookup Pattern:**
+
+| Agent | Primary Cache Keys | Fallback |
+|-------|-------------------|----------|
+| Macro Economy | `industry_trends`, `macro_regulatory` | Quick web search |
+| Complements | `partnership_ecosystem`, `company_overview` | Quick web search |
+| Substitutes | `competitor_landscape`, `emerging_threats` | Quick web search |
+| Comparative Advantage | `company_overview`, `competitor_landscape` | Quick web search |
+| Value Chain | `value_chain_economics`, `company_overview` | Quick web search |
+| JTBD | `customer_segments`, `company_overview` | Quick web search |
+| Competitive Strategy | `competitor_landscape`, `industry_trends` | Quick web search |
+
+**Cache Miss Handling:**
+
+When an agent needs information not in the cache:
+1. Check cache with keyword relevance search
+2. If relevant cache exists → synthesize from cached reports
+3. If no relevant cache → use Market Intel Tool for quick search
+4. Flag the gap in `research_gaps` for potential future improvement
+
+---
+
+#### 3.0.5.5 User Experience During Deep Research
+
+**Progress Display:**
+
+| Stage | User Feedback |
+|-------|--------------|
+| Planning | "Analyzing your strategic question to plan research..." |
+| Launching | "Starting {n} parallel research tasks..." |
+| In Progress | Progress bars per task with estimated time |
+| Completing | "Research complete. {n} comprehensive reports ready." |
+
+**Time Expectations:**
+
+| Research Scope | Typical Duration | Tasks |
+|----------------|------------------|-------|
+| Minimal (public company) | 10-15 min | 3 core tasks |
+| Standard | 15-20 min | 4-5 tasks |
+| Comprehensive | 20-30 min | 6-7 tasks |
+
+---
+
+#### 3.0.5.6 Analysis Mode with Deep Research
+
+**Updated Mode Determination:**
+
+| Mode | Criteria | Confidence Multiplier |
+|------|----------|----------------------|
+| **comprehensive** | Documents + Interview + Deep Research | 1.2x (highest confidence) |
+| **deep_research_enriched** | Interview + Deep Research (no docs) | 1.0x |
+| **document_enriched** | Documents + Interview (no deep research) | 0.9x |
+| **guided_context** | Interview only (no docs, no deep research) | 0.7x |
+| **quick_public** | Quick search only (skipped everything) | 0.5x |
+
+**Output Key:** `analysis:mode`
+
+---
+
 ### 3.1 Strategy Orchestrator (Root Agent)
 
 **Type:** `SequentialAgent` containing `ParallelAgent` sub-agents for concurrent phases
 
 **Responsibilities:**
-- Coordinate the 7-phase execution pipeline (Phase 0-6)
+- Coordinate the 8-phase execution pipeline (Phase 0, 0.5, 1-6)
 - Gather user context before analysis begins (Phase 0)
+- Trigger deep research with predictive task selection (Phase 0.5)
+- Manage research cache for downstream agent consumption
 - Inject foundation context into shared state
 - Run cross-agent coherence checks
 - Synthesize final narrative
@@ -342,12 +558,13 @@ Based on context gathered, the system determines the analysis mode:
 
 **Sub-Agents:**
 1. `phase0_context_agent` — Context Gathering (sequential)
-2. `phase1_parallel_agent` — Macro + Market Structure (parallel)
-3. `phase2_parallel_agent` — Comparative Advantage + Value Chain + JTBD (parallel)
-4. `phase3_competitive_agent` — Competitive Strategy (sequential)
-5. `phase4_synthesis_agent` — SWOT + Coherence + Narrative (sequential)
-6. `phase5_report_agent` — Executive Summary + Full Report (sequential)
-7. `phase6_presentation_agent` — Slides + Visuals + PDF (sequential)
+2. `phase0_5_research_agent` — Deep Research (parallel tasks)
+3. `phase1_parallel_agent` — Macro + Market Structure (parallel)
+4. `phase2_parallel_agent` — Comparative Advantage + Value Chain + JTBD (parallel)
+5. `phase3_competitive_agent` — Competitive Strategy (sequential)
+6. `phase4_synthesis_agent` — SWOT + Coherence + Narrative (sequential)
+7. `phase5_report_agent` — Executive Summary + Full Report (sequential)
+8. `phase6_presentation_agent` — Slides + Visuals + PDF (sequential)
 
 **Coherence Checks (Phase 4):**
 
@@ -365,14 +582,24 @@ Based on context gathered, the system determines the analysis mode:
 
 Each specialist agent is an `LlmAgent` with:
 - Specific `instruction` defining its analytical framework
-- Access to shared tools (Market Intel, Knowledge Base)
+- **Primary data source: Research Cache** (populated by Phase 0.5 Deep Research)
+- Fallback: Market Intel Tool for quick searches on cache misses
+- Access to user context from Phase 0 interview
 - Defined `output_key` for storing results in session state
 - Structured output via `output_schema`
 - Model: `gemini-3-pro-preview`
 
+**Data Priority for All Agents:**
+1. **Research Cache** — Deep research reports with citations (highest quality)
+2. **User Context** — Insider knowledge from Phase 0 interview
+3. **Document Insights** — Extracted from user-provided documents
+4. **Quick Search** — Fallback for cache misses (lowest priority)
+
 #### 3.2.1 Macro Economy Agent
 
 **Purpose:** Analyze business cycle, interest rates, FX, sector spending patterns
+
+**Research Cache Keys:** `industry_trends`, `macro_regulatory`
 
 **Output Fields:**
 | Field | Type | Description |
@@ -384,8 +611,9 @@ Each specialist agent is an `LlmAgent` with:
 | sector_trends | list[string] | Key sector movements |
 | strategic_implications | list[string] | Business implications |
 | confidence | ConfidenceMetadata | Confidence scoring |
+| sources | list[Citation] | Citations from research cache |
 
-**Tools:** `search_economic_data`, `get_fed_indicators`, `search_sector_trends`
+**Tools:** `research_cache.get()`, `search_economic_data` (fallback)
 
 **Output Key:** `macro_economy_analysis`
 
@@ -399,6 +627,8 @@ Each specialist agent is an `LlmAgent` with:
 
 ##### Complements Analysis Agent
 
+**Research Cache Keys:** `partnership_ecosystem`, `company_overview`
+
 **Output Fields:**
 | Field | Type | Description |
 |-------|------|-------------|
@@ -406,14 +636,17 @@ Each specialist agent is an `LlmAgent` with:
 | ecosystem_health | enum | strong, moderate, weak, fragmented |
 | vertical_integration_risks | list[string] | Integration risk factors |
 | strategic_implications | list[string] | Business implications |
+| sources | list[Citation] | Citations from research cache |
 
 **ComplementItem:** category, key_players, integration_depth (critical/deep/moderate/shallow), relationship_trend (strengthening/stable/weakening/adversarial)
 
-**Tools:** `search_partnerships`, `search_ecosystem`, `search_integrations`
+**Tools:** `research_cache.get()`, `search_partnerships` (fallback)
 
 **Output Key:** `complements_analysis`
 
 ##### Substitutes Analysis Agent
+
+**Research Cache Keys:** `competitor_landscape`, `emerging_threats`
 
 **Output Fields:**
 | Field | Type | Description |
@@ -423,10 +656,11 @@ Each specialist agent is an `LlmAgent` with:
 | switching_costs | enum | high, moderate, low |
 | substitution_triggers | list[string] | What causes switching |
 | defensibility_zones | list[string] | Protected areas |
+| sources | list[Citation] | Citations from research cache |
 
 **SubstituteItem:** name, type (direct/indirect/potential), threat_level (high/medium/low), switching_barrier
 
-**Tools:** `search_competitors`, `search_alternatives`, `analyze_trends`
+**Tools:** `research_cache.get()`, `search_competitors` (fallback)
 
 **Output Key:** `substitutes_analysis`
 
@@ -436,6 +670,8 @@ Each specialist agent is an `LlmAgent` with:
 
 **Purpose:** Identify what the firm does that others cannot easily replicate
 
+**Research Cache Keys:** `company_overview`, `competitor_landscape`
+
 **Output Fields:**
 | Field | Type | Description |
 |-------|------|-------------|
@@ -443,20 +679,23 @@ Each specialist agent is an `LlmAgent` with:
 | areas_of_parity | list[string] | Where firm matches competitors |
 | areas_of_disadvantage | list[string] | Where firm lags |
 | durability_assessment | string | Overall durability analysis |
+| sources | list[Citation] | Citations from research cache |
 
 **AdvantageItem:** advantage, source (scale/network_effects/ip/brand/capabilities/data/relationships), durability (durable/eroding/temporary), replicability (very_hard/hard/moderate/easy), monetization_status
 
-**Tools:** `search_patents`, `search_capabilities`, `analyze_historical_investment`
+**Tools:** `research_cache.get()`, `search_patents` (fallback)
 
 **Output Key:** `comparative_advantage_analysis`
 
-**Dependencies:** Reads `market_structure_analysis`
+**Dependencies:** Reads `market_structure_analysis`, `user_context:advantages`
 
 ---
 
 #### 3.2.4 Value Chain Agent
 
 **Purpose:** Analyze activities and margin drivers
+
+**Research Cache Keys:** `value_chain_economics`, `company_overview`
 
 **Output Fields:**
 | Field | Type | Description |
@@ -466,18 +705,23 @@ Each specialist agent is an `LlmAgent` with:
 | margin_drivers | list[string] | What drives margins |
 | cost_centers | list[string] | Major cost areas |
 | vertical_integration_level | enum | high, moderate, low |
+| sources | list[Citation] | Citations from research cache |
 
 **ActivityItem:** activity, margin_contribution (high/medium/low/negative), strategic_importance (critical/important/supporting), outsourced (bool)
 
-**Tools:** `analyze_cost_structure`, `search_segment_data`, `analyze_financials`
+**Tools:** `research_cache.get()`, `analyze_cost_structure` (fallback)
 
 **Output Key:** `value_chain_analysis`
+
+**Dependencies:** Reads `user_context:value_chain`
 
 ---
 
 #### 3.2.5 JTBD Agent (Jobs To Be Done)
 
 **Purpose:** Understand customer needs and hiring criteria
+
+**Research Cache Keys:** `customer_segments`, `company_overview`
 
 **Output Fields:**
 | Field | Type | Description |
@@ -488,18 +732,23 @@ Each specialist agent is an `LlmAgent` with:
 | hiring_criteria | list[string] | Why customers choose |
 | firing_triggers | list[string] | Why customers leave |
 | opportunities | list[string] | Market opportunities |
+| sources | list[Citation] | Citations from research cache |
 
 **JobItem:** job, job_type (functional/emotional/social), importance (critical/important/nice_to_have), current_satisfaction (high/medium/low/unmet)
 
-**Tools:** `search_customer_reviews`, `search_forums`, `analyze_surveys`
+**Tools:** `research_cache.get()`, `search_customer_reviews` (fallback)
 
 **Output Key:** `jtbd_analysis`
+
+**Dependencies:** Reads `user_context:jtbd`
 
 ---
 
 #### 3.2.6 Competitive Strategy Agent
 
 **Purpose:** Determine cost leadership vs. differentiation positioning
+
+**Research Cache Keys:** `competitor_landscape`, `industry_trends`
 
 **Output Fields:**
 | Field | Type | Description |
@@ -510,14 +759,15 @@ Each specialist agent is an `LlmAgent` with:
 | coherence_assessment | object | score (0-1), gaps, tensions |
 | recommended_position | string (optional) | Suggested positioning |
 | strategic_moves | list[StrategicMove] | Recommended actions |
+| sources | list[Citation] | Citations from research cache |
 
 **StrategicMove:** move, rationale, risk (high/medium/low), dependencies
 
-**Tools:** `analyze_pricing`, `analyze_brand_perception`, `search_positioning`
+**Tools:** `research_cache.get()`, `analyze_pricing` (fallback)
 
 **Output Key:** `competitive_strategy_analysis`
 
-**Dependencies:** Reads `comparative_advantage_analysis`, `value_chain_analysis`
+**Dependencies:** Reads `comparative_advantage_analysis`, `value_chain_analysis`, `user_context:strategy`
 
 ---
 
@@ -734,17 +984,20 @@ All agents share access to foundation context stored in session state:
 | `company:{key}` | `company:name`, `company:ticker` | Company being analyzed |
 | `analysis:{key}` | `analysis:mode`, `analysis:documents` | Session metadata |
 | `output:{key}` | `output:generate_slides` | Output configuration |
-| `user_context:{domain}` | `user_context:complements` | Domain-specific insider knowledge |
+| `user_context:{domain}` | `user_context:complements` | Domain-specific insider knowledge (Phase 0) |
+| `research_cache:{task_key}` | `research_cache:competitor_landscape` | Deep Research results with citations (Phase 0.5) |
 | `document_insights` | `document_insights` | Extracted document insights |
 
 **User Roles:** investor, employee, competitor, student, advisor, executive
 
-**Analysis Modes:**
+**Analysis Modes (Updated with Deep Research):**
 | Mode | Description | Confidence Impact |
 |------|-------------|-------------------|
-| document_enriched | User provided docs + answered questions | Full confidence |
-| guided_context | No docs, but answered most questions | 0.8x confidence |
-| public_only | Minimal user input | 0.5x confidence penalty |
+| comprehensive | Documents + Interview + Deep Research | 1.2x (highest) |
+| deep_research_enriched | Interview + Deep Research (no docs) | 1.0x |
+| document_enriched | Documents + Interview (no deep research) | 0.9x |
+| guided_context | Interview only | 0.7x |
+| quick_public | Quick search only (skipped everything) | 0.5x |
 
 ### 4.1.1 User Context Domains (from Phase 0)
 
@@ -766,12 +1019,47 @@ Each domain captures insider knowledge that agents consume:
 - `gaps_remaining` — What we still don't know
 - `source` — user_response, document, inferred, or unknown
 
+### 4.1.2 Research Cache (from Phase 0.5)
+
+Deep Research results are stored in the research cache for consumption by all analysis agents:
+
+| Cache Key | Consuming Agents | Content |
+|-----------|------------------|---------|
+| `research_cache:company_overview` | All agents | Business model, revenue, products, market position |
+| `research_cache:competitor_landscape` | Substitutes, Competitive Strategy, Comparative Advantage | Top competitors, market share, strategic positioning |
+| `research_cache:industry_trends` | Macro Economy, all agents | Growth drivers, disruption risks, technology shifts |
+| `research_cache:value_chain_economics` | Value Chain | Cost structures, margin distribution, make-vs-buy |
+| `research_cache:customer_segments` | JTBD | Customer types, purchase drivers, unmet needs |
+| `research_cache:partnership_ecosystem` | Complements | Key partnerships, integration dependencies |
+| `research_cache:macro_regulatory` | Macro Economy | Policy changes, regulatory factors |
+| `research_cache:emerging_threats` | Substitutes | New entrants, disruption, substitute threats |
+
+**Each cache entry contains:**
+- `task_key` — Research task identifier
+- `query` — Original research query
+- `report` — Full research report with markdown formatting
+- `citations` — List of source URLs with titles and relevance scores
+- `research_time_seconds` — Time taken for research
+- `completed_at` — Completion timestamp
+- `word_count` — Report length for quality assessment
+
+**Cache Metadata Keys:**
+| Key | Description |
+|-----|-------------|
+| `research_cache` | Full cache object with all results |
+| `research_metadata` | Timing, task count, completion stats |
+| `research_gaps` | Tasks that failed or timed out |
+
 ### 4.2 State Key Naming Convention
 
 | Pattern | Description |
 |---------|-------------|
 | `{agent_name}_analysis` | Agent's structured output |
 | `{agent_name}_raw` | Raw LLM response (debugging) |
+| `research_cache` | Full Deep Research cache object |
+| `research_cache:{task_key}` | Individual research result with citations |
+| `research_metadata` | Research timing and completion stats |
+| `research_gaps` | Research tasks that failed or timed out |
 | `executive_summary` | Executive summary from Report Agent |
 | `full_report` | Comprehensive report from Report Agent |
 | `presentation_structure` | Slide structure from Gemini 3 Pro |
@@ -779,7 +1067,7 @@ Each domain captures insider knowledge that agents consume:
 | `presentation_pdf` | Final slides PDF path |
 | `report_pdf` | Detailed report PDF path |
 | `temp:{key}` | Intermediate calculations |
-| `cache:search:{hash}` | Cached search results |
+| `cache:search:{hash}` | Cached quick search results (fallback) |
 | `cache:document:{id}` | Cached document extractions |
 | `cache:visual:{hash}` | Cached generated visuals |
 
@@ -806,32 +1094,69 @@ Phase 0: User Input → [Context Gathering Agent] ★ CRITICAL FOUNDATION
                   user_context:strategy     → consumed by Competitive Strategy Agent
                   analysis:mode             → confidence multiplier for all agents
               ↓
-Phase 1: Foundation + User Context → [Macro Agent, Market Structure Agent]
+Phase 0.5: Foundation Context → [Deep Research Agent] ★ AUTONOMOUS WEB RESEARCH
               │
-              ├── Macro Economy Agent (uses foundation_context)
-              │       ↓ macro_economy_analysis
+              ├── Research Task Planner (selects tasks based on strategic question)
+              │       ↓
+              │   research_tasks (3-7 parallel research queries)
+              │
+              ├── Parallel Deep Research Executor (Interactions API)
+              │       ↓
+              │   research_cache:company_overview      → consumed by ALL agents
+              │   research_cache:competitor_landscape  → consumed by Substitutes, Comp Strategy
+              │   research_cache:industry_trends       → consumed by Macro, all agents
+              │   research_cache:value_chain_economics → consumed by Value Chain
+              │   research_cache:customer_segments     → consumed by JTBD
+              │   research_cache:partnership_ecosystem → consumed by Complements
+              │   research_cache:macro_regulatory      → consumed by Macro Economy
+              │   research_cache:emerging_threats      → consumed by Substitutes
+              │
+              └── Research Cache Builder
+                      ↓
+                  research_cache (full cache with all results)
+                  research_metadata (timing, completion stats)
+                  research_gaps (failed/timed out tasks)
+              ↓
+Phase 1: User Context + Research Cache → [Macro Agent, Market Structure Agent]
+              │
+              ├── Macro Economy Agent
+              │   ├── reads: research_cache:industry_trends, research_cache:macro_regulatory
+              │   └── fallback: quick search via Market Intel Tool
+              │       ↓ macro_economy_analysis (with citations)
               │
               └── Market Structure Agent
-                  ├── Complements Agent (uses user_context:complements)
-                  │       ↓ complements_analysis
-                  └── Substitutes Agent (uses user_context:substitutes)
-                          ↓ substitutes_analysis
+                  ├── Complements Agent
+                  │   ├── reads: user_context:complements, research_cache:partnership_ecosystem
+                  │   └── fallback: quick search
+                  │       ↓ complements_analysis (with citations)
+                  └── Substitutes Agent
+                      ├── reads: user_context:substitutes, research_cache:competitor_landscape
+                      └── fallback: quick search
+                          ↓ substitutes_analysis (with citations)
               ↓
-Phase 2: + Phase 1 outputs → [Comp. Advantage, Value Chain, JTBD]
+Phase 2: + Phase 1 outputs + Research Cache → [Comp. Advantage, Value Chain, JTBD]
               │
-              ├── Comparative Advantage Agent (uses user_context:advantages)
-              │       ↓ comparative_advantage_analysis
+              ├── Comparative Advantage Agent
+              │   ├── reads: user_context:advantages, research_cache:company_overview
+              │   └── fallback: quick search
+              │       ↓ comparative_advantage_analysis (with citations)
               │
-              ├── Value Chain Agent (uses user_context:value_chain)
-              │       ↓ value_chain_analysis
+              ├── Value Chain Agent
+              │   ├── reads: user_context:value_chain, research_cache:value_chain_economics
+              │   └── fallback: quick search
+              │       ↓ value_chain_analysis (with citations)
               │
-              └── JTBD Agent (uses user_context:jtbd)
-                      ↓ jtbd_analysis
+              └── JTBD Agent
+                  ├── reads: user_context:jtbd, research_cache:customer_segments
+                  └── fallback: quick search
+                      ↓ jtbd_analysis (with citations)
               ↓
-Phase 3: + Phase 2 outputs → [Competitive Strategy]
+Phase 3: + Phase 2 outputs + Research Cache → [Competitive Strategy]
               │
-              └── Competitive Strategy Agent (uses user_context:strategy)
-                      ↓ competitive_strategy_analysis
+              └── Competitive Strategy Agent
+                  ├── reads: user_context:strategy, research_cache:competitor_landscape
+                  └── fallback: quick search
+                      ↓ competitive_strategy_analysis (with citations)
               ↓
 Phase 4: + All outputs → [SWOT Synthesis, Coherence Check, Narrative]
               ↓
@@ -839,22 +1164,56 @@ Phase 4: + All outputs → [SWOT Synthesis, Coherence Check, Narrative]
               ↓
 Phase 5: + All outputs → [Report Agent]
               ↓
-         executive_summary, full_report
+         executive_summary, full_report (includes source citations from research cache)
               ↓
 Phase 6: + Report outputs → [Presentation Agent]
               ↓
          presentation_structure, slide_visuals, presentation_pdf, report_pdf
 ```
 
-**Key Insight:** Each analysis agent receives both public data (via tools) AND insider context (via user_context:{domain}). The combination enables dramatically higher-confidence analysis than public-only approaches.
+**Key Insight:** Each analysis agent receives THREE data sources in priority order:
+1. **Research Cache** — Deep research reports with verified citations (highest quality)
+2. **User Context** — Insider knowledge from Phase 0 interview
+3. **Quick Search** — Fallback for cache misses (Market Intel Tool)
+
+This combination enables dramatically higher-confidence analysis than any single source approach.
 
 ---
 
 ## Part 5: Tool Architecture
 
-### 5.1 Market Intel Tool
+### 5.1 Research Cache Manager (NEW)
 
-**Purpose:** Central service for web search, news, and financial data with built-in caching
+**Purpose:** Manage Deep Research cache populated by Phase 0.5, providing fast access to cited research reports for all analysis agents
+
+**Methods:**
+| Method | Description |
+|--------|-------------|
+| `get(task_key)` | Retrieve specific research result by task key |
+| `get_relevant(keywords)` | Find research results matching keywords |
+| `get_citations(task_key)` | Get citations for a specific research result |
+| `has_coverage(domain)` | Check if domain has cached research |
+| `get_gaps()` | Return list of research gaps (failed/incomplete tasks) |
+
+**Usage Pattern:**
+```python
+# Primary: Check research cache first
+research = cache.get("competitor_landscape")
+if research:
+    citations = research.citations
+    report = research.report
+else:
+    # Fallback: Use quick search
+    result = market_intel.search_web(query)
+```
+
+**Output:** ResearchResult with report, citations, timing, and quality metadata
+
+---
+
+### 5.2 Market Intel Tool (Fallback)
+
+**Purpose:** Quick web search fallback when Research Cache has gaps. Used for cache misses during analysis.
 
 **Methods:**
 | Method | Description |
@@ -864,9 +1223,11 @@ Phase 6: + Report outputs → [Presentation Agent]
 | `search_sec_filings` | Search SEC filings (10-K, 10-Q, 8-K, DEF14A) |
 | `search_earnings_transcripts` | Retrieve earnings call transcripts |
 
+**Note:** This tool is the FALLBACK when Research Cache doesn't have relevant data. Deep Research results are preferred for their depth and citations.
+
 **Caching:** Results cached by query hash with configurable TTL (default 24h)
 
-### 5.2 Document Processor Tool (Docling)
+### 5.3 Document Processor Tool (Docling)
 
 **Purpose:** PDF and document processing with structured extraction
 
@@ -877,13 +1238,13 @@ Phase 6: + Report outputs → [Presentation Agent]
 
 **Output:** document_id, title, sections[], tables[], metadata
 
-### 5.3 Knowledge Base Tool
+### 5.4 Knowledge Base Tool
 
 **Purpose:** Unified access to all knowledge sources with priority ranking
 
-**Source Priority:** documents → user_context → public_structured → public_unstructured
+**Source Priority:** research_cache → documents → user_context → quick_search
 
-### 5.4 Visual Generator Tool
+### 5.5 Visual Generator Tool
 
 **Purpose:** Generate presentation visuals using Nano Banana Pro
 
@@ -893,7 +1254,7 @@ Phase 6: + Report outputs → [Presentation Agent]
 | `generate_slide_visual` | Generate visual from description |
 | `generate_framework_diagram` | Generate Porter's, SWOT, Value Chain diagrams |
 
-### 5.5 PDF Generator Tool
+### 5.6 PDF Generator Tool
 
 **Purpose:** Generate PDF presentations and reports using PyMuPDF
 
@@ -915,7 +1276,9 @@ Phase 6: + Report outputs → [Presentation Agent]
 
 | Table | Purpose |
 |-------|---------|
-| `search_cache` | Cached search results with TTL |
+| `research_cache` | Deep Research results with citations (Phase 0.5) |
+| `research_interactions` | Deep Research interaction IDs for resumption |
+| `search_cache` | Quick search results with TTL (fallback) |
 | `document_cache` | Cached document extractions |
 | `visual_cache` | Cached generated visuals |
 | `analysis_sessions` | Analysis metadata and status |
@@ -929,7 +1292,8 @@ Phase 6: + Report outputs → [Presentation Agent]
 
 | Cache Type | Key Pattern | TTL |
 |------------|-------------|-----|
-| Search results | query hash | 24 hours (configurable) |
+| Deep Research results | task_key | Session-bound (persistent for session) |
+| Quick search results | query hash | 24 hours (configurable) |
 | Documents | file hash | Persistent |
 | Visuals | prompt hash | Persistent |
 
@@ -945,6 +1309,10 @@ Phase 6: + Report outputs → [Presentation Agent]
 | `context.document` | Document processing and extraction |
 | `context.interview` | Guided interview Q&A |
 | `context.mode` | Analysis mode determination |
+| `research.plan` | Deep Research task planning |
+| `research.start/progress/complete/error` | Deep Research execution lifecycle |
+| `research.cache_hit/cache_miss` | Research cache access patterns |
+| `research.citation` | Citation tracking |
 | `agent.start/complete/error` | Agent lifecycle |
 | `llm.request/response/error/tokens` | LLM interactions |
 | `tool.call/result/error/cache_hit` | Tool executions |
@@ -1010,6 +1378,12 @@ strategy_analysis_agent/
 │   │   │   ├── document.py        # Document Processor Agent
 │   │   │   ├── interview.py       # Guided Interview Agent
 │   │   │   └── questions.py       # Domain-specific question banks
+│   │   ├── deep_research/         # Phase 0.5 (NEW)
+│   │   │   ├── __init__.py
+│   │   │   ├── planner.py         # Research Task Planner
+│   │   │   ├── executor.py        # Parallel Deep Research Executor
+│   │   │   ├── cache_builder.py   # Research Cache Builder
+│   │   │   └── task_templates.py  # Research task templates
 │   │   ├── macro_economy.py       # Phase 1
 │   │   ├── market_structure.py    # Phase 1
 │   │   ├── complements.py
@@ -1022,7 +1396,8 @@ strategy_analysis_agent/
 │   │   ├── report.py              # Phase 5
 │   │   └── presentation.py        # Phase 6
 │   ├── tools/
-│   │   ├── market_intel.py
+│   │   ├── research_cache.py      # Research Cache Manager (NEW)
+│   │   ├── market_intel.py        # Quick search fallback
 │   │   ├── document_processor.py
 │   │   ├── knowledge_base.py
 │   │   ├── visual_generator.py
@@ -1031,6 +1406,7 @@ strategy_analysis_agent/
 │   ├── schemas/
 │   │   ├── foundation.py
 │   │   ├── context.py             # User context schemas
+│   │   ├── research.py            # Research cache schemas (NEW)
 │   │   ├── outputs.py
 │   │   ├── report.py
 │   │   ├── presentation.py
@@ -1038,6 +1414,7 @@ strategy_analysis_agent/
 │   ├── services/
 │   │   ├── session.py
 │   │   ├── cache.py
+│   │   ├── deep_research.py       # Deep Research service (NEW)
 │   │   ├── logging.py
 │   │   └── database.py
 │   ├── coherence/
@@ -1049,6 +1426,7 @@ strategy_analysis_agent/
 ├── data/prompts/
 │   ├── foundation_setup.md        # Phase 0
 │   ├── guided_interview.md        # Phase 0
+│   ├── research_task_templates.md # Phase 0.5 (NEW)
 │   ├── macro_economy.md
 │   ├── complements.md
 │   ├── executive_summary.md
@@ -1060,6 +1438,10 @@ strategy_analysis_agent/
 │   │   ├── test_foundation.py
 │   │   ├── test_document.py
 │   │   └── test_interview.py
+│   ├── test_deep_research/        # Phase 0.5 tests (NEW)
+│   │   ├── test_planner.py
+│   │   ├── test_executor.py
+│   │   └── test_cache.py
 │   └── ...
 └── scripts/
 ```
@@ -1111,22 +1493,39 @@ strategy_analysis_agent/
    - → `user_context:{domain}` for each domain
 4. **Mode Determination:**
    - Calculate context completeness per domain
-   - Set analysis mode: document_enriched (1.0x) / guided_context (0.8x) / public_only (0.5x)
+   - Determine if Deep Research should run
    - → `analysis:mode`
 
+**Phase 0.5 — Deep Research (Parallel) ★ AUTONOMOUS WEB RESEARCH:**
+1. **Research Task Planning:**
+   - Analyze strategic question and foundation context
+   - Select 3-7 research tasks (core + conditional)
+   - → `research_tasks`
+2. **Parallel Deep Research Execution:**
+   - Launch all research tasks via Interactions API
+   - Stream progress updates to user
+   - Timeout: 30 min max (typical: 15-20 min)
+   - → `research_cache:{task_key}` for each completed task
+3. **Research Cache Building:**
+   - Collect all research results with citations
+   - Index by domain for fast agent lookup
+   - → `research_cache`, `research_metadata`, `research_gaps`
+
 **Phase 1 — External Context (Parallel):**
-- Macro Economy Agent (reads: `foundation_context`) → `macro_economy_analysis`
+- Macro Economy Agent
+  - reads: `research_cache:industry_trends`, `research_cache:macro_regulatory`
+  - fallback: quick search → `macro_economy_analysis`
 - Market Structure Agent:
-  - Complements Agent (reads: `user_context:complements`) → `complements_analysis`
-  - Substitutes Agent (reads: `user_context:substitutes`) → `substitutes_analysis`
+  - Complements Agent (reads: `user_context:complements`, `research_cache:partnership_ecosystem`) → `complements_analysis`
+  - Substitutes Agent (reads: `user_context:substitutes`, `research_cache:competitor_landscape`) → `substitutes_analysis`
 
 **Phase 2 — Firm Analysis (Parallel):**
-- Comparative Advantage Agent (reads: `user_context:advantages`) → `comparative_advantage_analysis`
-- Value Chain Agent (reads: `user_context:value_chain`) → `value_chain_analysis`
-- JTBD Agent (reads: `user_context:jtbd`) → `jtbd_analysis`
+- Comparative Advantage Agent (reads: `user_context:advantages`, `research_cache:company_overview`) → `comparative_advantage_analysis`
+- Value Chain Agent (reads: `user_context:value_chain`, `research_cache:value_chain_economics`) → `value_chain_analysis`
+- JTBD Agent (reads: `user_context:jtbd`, `research_cache:customer_segments`) → `jtbd_analysis`
 
 **Phase 3 — Strategy (Sequential):**
-- Competitive Strategy Agent (reads: `user_context:strategy`) → `competitive_strategy_analysis`
+- Competitive Strategy Agent (reads: `user_context:strategy`, `research_cache:competitor_landscape`) → `competitive_strategy_analysis`
 
 **Phase 4 — Synthesis (Sequential):**
 - SWOT Agent → `swot_synthesis`
@@ -1135,7 +1534,7 @@ strategy_analysis_agent/
 
 **Phase 5 — Report Generation (Sequential):**
 - Executive Summary Generator → `executive_summary`
-- Full Report Generator → `full_report`
+- Full Report Generator → `full_report` (includes citations from research cache)
 
 **Phase 6 — Presentation (Sequential):**
 - Slide Structure Generator → `presentation_structure`
@@ -1143,7 +1542,7 @@ strategy_analysis_agent/
 - PDF Assembler → `presentation_pdf`, `report_pdf`
 
 **Completion:**
-- Store outputs, log metrics, return results with confidence scores
+- Store outputs, log metrics, return results with confidence scores and source citations
 
 ### 11.2 Context Gathering Flow Detail
 
@@ -1182,19 +1581,37 @@ User Starts Session
 │ Inform user of confidence implications                        │
 └───────────────────────────────────────────────────────────────┘
         ↓
-    Analysis Begins (Phase 1-6)
+┌───────────────────────────────────────────────────────────────┐
+│ Deep Research (Phase 0.5) ★ AUTONOMOUS                        │
+│                                                               │
+│ Planning: Analyze strategic question → select research tasks  │
+│                                                               │
+│ Execution (Parallel):                                         │
+│   ├── [████████████████░░░░] Company Overview (80%)          │
+│   ├── [██████████████░░░░░░] Competitor Landscape (70%)      │
+│   ├── [████████░░░░░░░░░░░░] Industry Trends (40%)           │
+│   └── [██████░░░░░░░░░░░░░░] Value Chain Economics (30%)     │
+│                                                               │
+│ ⏱️  Typical duration: 15-20 minutes                           │
+│                                                               │
+│ Cache Building: Index all research by domain for fast lookup  │
+└───────────────────────────────────────────────────────────────┘
+        ↓
+    Analysis Begins (Phase 1-6) — Uses Research Cache
 ```
 
 ### 11.3 How Agents Use Context
 
 Each analysis agent follows this pattern:
 
-1. **Read user context:** `state.get("user_context:{domain}")`
-2. **Check confidence level:** If high → prioritize user insights; if low → rely more on public data
-3. **Search public sources:** Use Market Intel tool for external data
-4. **Synthesize:** Combine insider knowledge + public data
-5. **Score confidence:** Apply `analysis:mode` multiplier to final confidence
-6. **Flag gaps:** Note where user context was missing in output
+1. **Query research cache:** `research_cache.get("{domain_key}")` for pre-researched reports
+2. **Read user context:** `state.get("user_context:{domain}")` for insider knowledge
+3. **Check document insights:** `state.get("document_insights")` if documents provided
+4. **Fallback search (if cache miss):** Use Market Intel tool for quick search
+5. **Synthesize:** Combine research cache + user context + document insights
+6. **Include citations:** Preserve source URLs from research cache in output
+7. **Score confidence:** Apply `analysis:mode` multiplier (1.2x for comprehensive, 0.5x for quick_public)
+8. **Flag gaps:** Note where research cache had gaps or fallback was used
 
 ---
 
@@ -1209,6 +1626,7 @@ Each analysis agent follows this pattern:
 | End-to-End Tests | Full pipeline with mock/real data, complete report + presentation |
 | Evaluation Tests | Output quality, coherence detection accuracy, verdict accuracy |
 | Context Tests | Phase 0 interview flow, document extraction, mode determination |
+| Research Tests | Phase 0.5 task planning, parallel execution, cache building |
 
 ### 12.2 Key Test Scenarios
 
@@ -1221,15 +1639,30 @@ Each analysis agent follows this pattern:
 - Mode determination correctly calculates confidence multiplier
 - Context completeness scores are accurate per domain
 
+**Phase 0.5 — Deep Research:**
+- Research task planner selects correct tasks based on strategic question
+- Core tasks (company_overview, competitor_landscape, industry_trends) always run
+- Conditional tasks only run when strategic question matches condition
+- Parallel execution launches all tasks simultaneously
+- Streaming progress updates work correctly
+- Research cache stores results with citations
+- Cache miss handling triggers quick search fallback
+- Timeout handling uses partial results gracefully
+- Research gaps are correctly identified and logged
+
 **Phase 1-6 — Analysis:**
-- Agents correctly read and prioritize user_context:{domain}
-- Confidence scores reflect analysis:mode multiplier
+- Agents correctly query research cache first
+- Agents fall back to quick search on cache miss
+- Agents correctly read user_context:{domain} for insider knowledge
+- Confidence scores reflect analysis:mode multiplier (1.2x to 0.5x)
+- Source citations from research cache are preserved in outputs
 - Public-only mode explicitly flags lower confidence
 - Executive summary answers the strategic question
 - Strategic verdict is decisive (not hedged)
 - All takeaways trace to source agents
 - Critical risks incorporate coherence flags
 - Report sections are complete and cross-referenced
+- Report includes source citations from research cache
 - Presentation uses report data accurately
 
 ### 12.3 Context Quality Scenarios
@@ -1275,10 +1708,18 @@ Each analysis agent follows this pattern:
 
 ---
 
-*Document Version: 4.0*
-*Last Updated: 2025-12-11*
+*Document Version: 5.0*
+*Last Updated: 2025-12-12*
 
 **Changelog:**
+- **v5.0** (2025-12-12): Added Phase 0.5 Deep Research Agent — autonomous web research via Gemini Deep Research Agent (`deep-research-pro-preview-12-2025`). System now has 8 phases (0, 0.5, 1-6) and 14 agents. Key changes:
+  - Added Deep Research Agent with Research Task Planner, Parallel Executor, and Cache Builder
+  - Added Research Cache Manager to Shared Services (primary data source for all analysis agents)
+  - All analysis agents now query research_cache first, with quick search fallback
+  - Updated analysis modes: comprehensive (1.2x), deep_research_enriched (1.0x), document_enriched (0.9x), guided_context (0.7x), quick_public (0.5x)
+  - Added research task templates (core: company_overview, competitor_landscape, industry_trends; conditional: value_chain_economics, customer_segments, etc.)
+  - All agent outputs now include source citations from research cache
+  - Added research_cache:{task_key} state keys and research_metadata
 - **v4.0** (2025-12-11): Added Phase 0 Context Gathering Agent — the critical foundation that extracts insider knowledge before analysis begins. System now has 7 phases (0-6) and 13 agents. Added guided interview with domain-specific questions, document processing, analysis mode determination, and user_context:{domain} state keys consumed by each analysis agent.
 - **v3.0** (2025-12-11): Added Phase 5 Report Agent, removed implementation code, converted to specification tables
 - **v2.0** (2025-01-15): Added Gemini 3 Pro, Phase 5 Presentation Agent, Nano Banana Pro, PyMuPDF
